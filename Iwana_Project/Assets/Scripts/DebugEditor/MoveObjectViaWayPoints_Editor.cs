@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,40 +24,41 @@ public class MoveObjectViaWayPoints_Editor : Editor
 
         for (int i = 0; i < thisScript.moves.Count; i++)
         {
-            Transform point = thisScript.moves[i].transform;
+            Vector3 point = thisScript.moves[i].position;
 
-            if (point != null)
+            if (point != null)  // `null` チェックは不要。`point` は `Vector3` 型なので
             {
                 // ポイントの移動
                 EditorGUI.BeginChangeCheck();
-                Vector3 newPosition = Handles.PositionHandle(point.position, Quaternion.identity);
+                Vector3 newPosition = Handles.PositionHandle(point, Quaternion.identity);
                 if (EditorGUI.EndChangeCheck())
                 {
-                    Undo.RecordObject(point, "Move Patrol Point");
-                    point.position = newPosition;
+                    // Undo履歴を記録
+                    Undo.RecordObject(thisScript, "Move Patrol Point");
+                    thisScript.moves[i].position = newPosition;  // moves[i] の position を更新
                 }
 
                 // 円を描画
-                Handles.DrawWireDisc(point.position, Vector3.forward, 0.01f);
+                Handles.DrawWireDisc(point, Vector3.forward, 0.01f);
             }
             // 矢印を描画
             if (thisScript.moves.Count - 1 < 2 && i < thisScript.moves.Count - 1 && thisScript.moves[i + 1] != null)
             {
-                DrawArrowToArrow(point.position, thisScript.moves[i + 1].transform.position, Color.yellow);
-            }      
-            else if(i < thisScript.moves.Count - 1 && thisScript.moves[i + 1] != null)
+                DrawArrowToArrow(point, thisScript.moves[i + 1].position, Color.yellow);
+            }
+            else if (i < thisScript.moves.Count - 1 && thisScript.moves[i + 1] != null)
             {
-               if(thisScript.isReverse) DrawArrow(point.position, thisScript.moves[i + 1].transform.position, Color.yellow);
-               else DrawArrow(thisScript.moves[i + 1].transform.position,point.position, Color.yellow);
+                if (thisScript.isReverse) DrawArrow(point, thisScript.moves[i + 1].position, Color.yellow);
+                else DrawArrow(thisScript.moves[i + 1].position, point, Color.yellow);
             }
             else if (thisScript.moves.Count >= 3 && thisScript.isFullLoop)
             {
-                if (thisScript.isReverse) DrawArrow(point.position, thisScript.moves[0].transform.position, Color.red);
-                else DrawArrow(thisScript.moves[0].transform.position, point.position, Color.red);
+                if (thisScript.isReverse) DrawArrow(point, thisScript.moves[0].position, Color.red);
+                else DrawArrow(thisScript.moves[0].position, point, Color.red);
             }
 
             // ラベル
-            Handles.Label(point.position, $"Move Point: {i}", labelStyle);
+            Handles.Label(point, $"Move Point: {i}", labelStyle);
         }
     }
     // お互いの方向を描画するメソッド.
@@ -146,7 +148,46 @@ public class MoveObjectViaWayPoints_Editor : Editor
         base.OnInspectorGUI();
         machine = (Machine)target;
         EditorGUILayout.LabelField("MoveObjectViaWayPoints 用カスタム設定", EditorStyles.boldLabel);
+        
+        // ドラッグアンドドロップ受付用の領域を作成
+        Rect dropArea = GUILayoutUtility.GetRect(0.0f, 50.0f, GUILayout.ExpandWidth(true));
+        GUI.Box(dropArea, "ここに GameObject をドラッグ＆ドロップ", EditorStyles.helpBox);
 
+        // ドラッグ処理
+        Event evt = Event.current;
+        switch (evt.type)
+        {
+            case EventType.DragUpdated:
+            case EventType.DragPerform:
+                if (!dropArea.Contains(evt.mousePosition))
+                    break;
+
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                if (evt.type == EventType.DragPerform)
+                {
+                    DragAndDrop.AcceptDrag();
+                    Undo.RecordObject(machine, "Add Move Points");
+
+                    foreach (Object draggedObj in DragAndDrop.objectReferences)
+                    {
+                        if (draggedObj is GameObject go)
+                        {
+                            MoveSetting newSetting = new MoveSetting
+                            {
+                                position = go.transform.position,
+                                moveSpeed = 1f
+                            };
+                            ((MoveObjectViaWayPoints)target).moves.Add(newSetting);
+                        }
+                    }
+
+                    EditorUtility.SetDirty(machine);
+                }
+
+                evt.Use();
+                break;
+        }
 
         if (GUILayout.Button("Start_Machine"))
         {

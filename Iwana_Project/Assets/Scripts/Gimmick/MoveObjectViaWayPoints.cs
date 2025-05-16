@@ -7,7 +7,7 @@ using UnityEngine;
 public class MoveSetting
 {
     [SerializeField, Tooltip("ˆÚ“®‘¬“x"), Min(0f)] public float moveSpeed = 1f;
-    [SerializeField, Tooltip("ˆÚ“®æ")]   public Transform transform;
+    [SerializeField, Tooltip("ˆÚ“®æ")]            public Vector3 position;
 }
 
 public class MoveObjectViaWayPoints : Machine
@@ -51,9 +51,9 @@ public class MoveObjectViaWayPoints : Machine
         yield return null;
         while (isActive)
         {
-            while (Vector2.Distance(transform.position, moves[moveIndex].transform.position) > 0.05f)
+            while (Vector2.Distance(transform.position, moves[moveIndex].position) > 0.05f)
             {
-                transform.position = Vector3.MoveTowards(transform.position, moves[moveIndex].transform.position, Time.deltaTime * moves[moveIndex].moveSpeed);
+                transform.position = Vector3.MoveTowards(transform.position, moves[moveIndex].position, Time.deltaTime * moves[moveIndex].moveSpeed);
                 yield return null;
             }
 
